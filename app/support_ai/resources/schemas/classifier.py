@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List
-from .type_ansers import IntentType
+from .type_ansers import IntentType, CreateFormType
 
 
 class IntentClassifier(BaseModel):
@@ -33,3 +33,7 @@ class DynemicRagContext(BaseModel):
         description="Динамически сформированный контекст для RAG поиска"
     )
     
+class FormClassifier(BaseModel):
+    form_type: CreateFormType = Field(
+        description="Результат классификации создания зявки"
+    )

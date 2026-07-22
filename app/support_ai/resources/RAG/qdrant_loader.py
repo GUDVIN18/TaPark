@@ -18,7 +18,7 @@ embeddings_qwen = QwenEmbedding(
     dimensions=config.VECTOR_DIMENSION
 )
 
-qdrant_client = QdrantClient(host="localhost", port=config.QDRANT_PORT)
+qdrant_client = QdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
 
 class SleepAiRagEmbeddingConfig:
     headers_to_split_on = [
@@ -168,7 +168,7 @@ class SleepAiRagEmbeddingConfig:
 
     @staticmethod
     def write_schema(file_path: Path, schema: dict[str, Any]) -> None:
-        schema_path = file_path.parent / "shema.json"
+        schema_path = Path(__file__).parent / "knowledge_base" / "shema.json"
         with open(schema_path, "w", encoding="utf-8") as f:
             json.dump(schema, f, ensure_ascii=False, indent=2)
 

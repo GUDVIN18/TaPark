@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional, Literal, List
 from langchain_core.messages import BaseMessage
 from .buttons import Button, ButtonType
+from .type_ansers import CreateFormType
 
 
 class UploadSupportAi(BaseModel):
@@ -42,6 +43,18 @@ class SupportAi(UploadSupportAi):
         None,
         description="Контекст из векторной базы знаний для формирования ответа"
     )
+    create_form: Optional[CreateFormType] = Field(
+        None,
+        description="Создание заявки в тех поддержку"
+    )
+    user_email: str = Field(
+        None,
+        description="Email пользователя"
+    )
+    user_content: str = Field(
+        None,
+        description="Вопрос пользователя в поддержку"
+    )
     answer: str = Field(
         None,
         description=(
@@ -73,11 +86,5 @@ class SupportAi(UploadSupportAi):
     # - Формат: "Добавить [тема] в дневник"
     # - Тему бери из сути вопроса пользователя, не из примеров
 
-
-# Ответ
-class ResponseSupportAi(BaseModel):
-    message: str = Field(description="Ответ AI")
-    # buttons: Optional[List[Button]] = Field(
-    #     None,
-    #     description="Кнопки"
-    # )
+class UpdateKbRequest(BaseModel):
+    path: str = Field(description="Относительный путь до загруженного .md файла")

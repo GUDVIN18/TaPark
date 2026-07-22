@@ -7,13 +7,17 @@ from .parcers import (
     parser_main_llm,
     parser_intent_classifier,
     parcer_rag_context,
+    parser_form_type
 )
 from ..RAG.rag_pipline import build_rag_query, retrieve_docs
 from ..schemas import (
     SupportAi,
-    IntentType
+    IntentType,
+    CreateFormType,
 )
 from app.include.decorator import current_time
+from langgraph.types import interrupt
+from app.usedesc.service import usedesk_service
 
 
 def _format_rag_context_history(rag_context_history: list[dict] | None) -> str:
@@ -164,6 +168,9 @@ async def dynemic_rag_context(state: SupportAi) -> SupportAi:
     5. Если вопрос является уточнением к предыдущему ответу, используй историю диалога и последние RAG контексты,
        чтобы сохранить прежнюю тему поиска.
 
+    Дполнения по разделам:
+    1. Раздел Печатные формы отвечает в том числе за Договора. 
+
     Схема базы знаний:
     {rag_schema}
 
@@ -201,6 +208,7 @@ async def dynemic_rag_context(state: SupportAi) -> SupportAi:
     state.llm_rag_context = result['rag_context']
     return state
 
+
 @current_time
 async def search_vector_db(state: SupportAi) -> SupportAi:
     """Узел для поиска докуметов в векторной БД"""
@@ -212,11 +220,151 @@ async def search_vector_db(state: SupportAi) -> SupportAi:
     log.debug(f"{state.user_id}: Найдено {len(docs)} документов")
     return state
 
+
+@current_time
 async def call_admin(state: SupportAi) -> SupportAi:
-    """Узел для вызова администратора (оператора)"""
-    log.info(f"{state.user_id}: Вызов администратора (оператора) для обработки вопроса.")
-    state.answer = "Ваш вопрос требует вмешательства оператора. Пожалуйста, ожидайте ответа."
+    """Запрашивает подтверждение создания заявки"""
+
+    confirmation = interrupt({
+        "type": "operator_confirmation",
+        "message": (
+            "Ваш вопрос требует вмешательства оператора. "
+            "Вы готовы заполнить форму обратной связи?"
+        ),
+    })
+    state.message = str(confirmation).strip()
+
+    log.info(
+        f"{state.user_id}: Получен ответ на создание заявки: "
+        f"{state.message}"
+    )
     return state
+
+
+@current_time
+async def classify_operator_confirmation(state: SupportAi) -> SupportAi:
+    """Узел для определения намеренья создания заявки"""
+    history_messages = state.history_messages[-3:] if state.history_messages else []
+
+    prompt_template = PromptTemplate(
+        template="""
+    Ты классифицируешь текущее сообщение пользователя для определения - создаем зявку или нет.
+
+    Доступные категории: CONFIRMED, DECLINED
+
+    CONFIRMED - если пользователь подтверждает создание заявки
+    DECLINED - если пользователь отказывается от создания заявки
+
+    История диалога:
+    {history}
+
+    Текущий вопрос пользователя:
+    {input}
+
+    {format_instructions}
+
+    Верни ТОЛЬКО JSON без дополнительных комментариев!
+    Значение form_type должно быть строго одним из: CONFIRMED, DECLINED
+    """,
+        input_variables=[
+            "input",
+            "history",
+        ],
+        partial_variables={
+            "format_instructions": parser_form_type.get_format_instructions(),
+        }
+    )
+
+    chain = prompt_template | llm_analytics | parser_form_type
+    result = await chain.ainvoke({
+        "input": state.message,
+        "history": history_messages,
+    })
+    state.create_form = result['form_type']
+    log.info(f"{state.user_id}: Классификация составления заявки: {result['form_type']}")
+    return state
+
+
+def route_operator_confirmation(state: SupportAi) -> str:
+    """Направляет диалог по сохраненному результату классификации."""
+    if isinstance(state.create_form, CreateFormType):
+        return state.create_form.value
+    return str(state.create_form)
+
+
+@current_time
+async def request_user_email(state: SupportAi) -> SupportAi:
+    """Запрашивает email пользователя для обратной связи"""
+
+    email = interrupt({
+        "type": "user_email",
+        "message": (
+            "Укажите, пожалуйста, ваш email для обратной связи."
+        ),
+    })
+
+    state.user_email = str(email).strip()
+    state.message = state.user_email
+
+    log.info(
+        f"{state.user_id}: Получен email для заявки: "
+        f"{state.user_email}"
+    )
+
+    return state
+
+
+@current_time
+async def request_user_content(state: SupportAi) -> SupportAi:
+    """Запрашивает содержание обращения пользователя"""
+
+    user_content = interrupt({
+        "type": "user_content",
+        "message": (
+            "Опишите, пожалуйста, что вы хотите узнать "
+            "или какую проблему необходимо решить."
+        ),
+    })
+
+    state.user_content = str(user_content).strip()
+    state.message = state.user_content
+
+    log.info(
+        f"{state.user_id}: Получено содержание заявки: "
+        f"{state.user_content}"
+    )
+
+    return state
+
+@current_time
+async def send_form_operator(state: SupportAi) -> SupportAi:
+    text = (
+        "Новая заявка в тех. поддержку через AI\n\n"
+        f"Email: {state.user_email}\n"
+        f"Сообщение пользователя: {state.user_content}"
+    )
+    await usedesk_service.send_message(
+        text=text,
+        sender='client',
+        name=f"Клиент {state.user_email}",
+        email=state.user_email
+    )
+    state.answer = "Ваша заявка успешно отправлена!"
+    return state
+
+
+@current_time
+async def cancel_operator_request(state: SupportAi) -> SupportAi:
+    """Пользователь отказался от создания заявки"""
+    log.info(
+        f"{state.user_id}: Пользователь отказался от создания заявки."
+    )
+    state.answer = (
+        "Хорошо, заявка не будет создана. "
+        "Если у вас возникнут другие вопросы, я постараюсь помочь."
+    )
+    return state
+
 
 @current_time
 async def llm_response(state: SupportAi) -> SupportAi:
@@ -238,6 +386,10 @@ async def llm_response(state: SupportAi) -> SupportAi:
 
     Контекст из базы знаний:
     {context}
+
+    Правило использования контекста:
+    Если контекст содержит описание назначения раздела, список функций или доступных операций,
+    этого достаточно для ответа. Не пиши, что в базе знаний нет определения.
 
     История диалога:
     {history}

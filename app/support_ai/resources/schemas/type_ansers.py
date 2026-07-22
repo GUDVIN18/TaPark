@@ -8,3 +8,7 @@ class IntentType(str, Enum):
     KNOWLEDGE = "KNOWLEDGE"
     OPERATOR = "OPERATOR"
     CHAT = "CHAT"
+
+class CreateFormType(str, Enum):
+    CONFIRMED = "CONFIRMED"
+    DECLINED = "DECLINED"

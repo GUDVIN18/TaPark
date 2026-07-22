@@ -1,37 +1,40 @@
+import asyncio
 import datetime as dt
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy.engine import Connection
-from typing import List, Dict, Any
+import re
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from .resources.schemas.support import (
-    ResponseSupportAi, 
     UploadSupportAi, 
-    SupportAi
+    SupportAi,
+    UpdateKbRequest,
 )
 from .resources.pipline import geration_pipe
 from app.include.logging_config import logger as log
 from ..include.permissions import secret_access
 from .resources.exceptions import SupportAiErrorGeneration
+from .resources.service import (
+    _safe_upload_name, 
+    _resolve_uploaded_md,
+    KNOWLEDGE_BASE_DIR,
+    UPLOAD_DIR,
+)
 
 
 router = APIRouter()
 
 @router.post(
     "/chat",
-    response_model=ResponseSupportAi,
+    response_model=SupportAi,
     dependencies=[Depends(secret_access)],
     name="Задать вопрос и получить ответ",
 )
 async def support(
     data: UploadSupportAi,
-):
+) -> SupportAi:
     log.success(f"{data.user_id}: QUESTION {data=}")
     try:
         support_ai_answer: SupportAi = await geration_pipe(data=data)
-        return ResponseSupportAi(
-            message=support_ai_answer.answer,
-            # buttons=support_ai_answer.buttons
-        )
+        return support_ai_answer
     except Exception as e:
         log.error(f"Unhandled error in /chat endpoint: {e}")
         raise SupportAiErrorGeneration
@@ -40,18 +43,57 @@ async def support(
     "/upload/kb",
     response_model=str,
     dependencies=[Depends(secret_access)],
-    name="Загрузка базы знаний для RAG и обновление векторов",
+    name="Загрузка файла базы знаний",
 )
 async def upload_kb(
     file: UploadFile = File(...),
 ):
-    # Проверка расширения
     if not file.filename.lower().endswith(".md"):
         raise HTTPException(
             status_code=400,
             detail="Допускаются только файлы формата .md",
         )
+
     content = await file.read()
-    text = content.decode("utf-8")
-    log.info(f"{text=}")
-    return "OK"
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    upload_path = UPLOAD_DIR / _safe_upload_name(file.filename)
+    upload_path.write_bytes(content)
+
+    return upload_path.resolve().relative_to(Path.cwd().resolve()).as_posix()
+
+
+@router.get(
+    "/kb/files",
+    response_model=list[str],
+    dependencies=[Depends(secret_access)],
+    name="Получить список загруженных файлов базы знаний",
+)
+async def get_kb_files():
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    return [
+        path.resolve().relative_to(Path.cwd().resolve()).as_posix()
+        for path in sorted(UPLOAD_DIR.glob("*.md"))
+        if path.is_file()
+    ]
+
+
+@router.post(
+    "/update/kb",
+    response_model=str,
+    dependencies=[Depends(secret_access)],
+    name="Обновление Qdrant и векторов RAG",
+)
+async def update_kb(data: UpdateKbRequest):
+    from .resources.RAG.qdrant_loader import SleepAiRagEmbeddingConfig
+
+    file_path = _resolve_uploaded_md(data.path)
+    await asyncio.to_thread(
+        SleepAiRagEmbeddingConfig.run_qdrant_pipeline,
+        file_path=file_path,
+    )
+    return f"Qdrant обновлен из файла: {file_path.resolve().relative_to(Path.cwd().resolve()).as_posix()}"
+
+
+
+    

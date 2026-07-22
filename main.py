@@ -1,6 +1,7 @@
 from app.include.logging_config import logger as log
 from fastapi import Depends, FastAPI
 from fastapi.security import APIKeyHeader
+from fastapi.staticfiles import StaticFiles
 from app.router import main_router
 import uvicorn
 
@@ -15,6 +16,7 @@ app = FastAPI(
     ],
 )
 app.include_router(main_router)
+app.mount("/front", StaticFiles(directory="app/front", html=True), name="front")
 
 if __name__ == "__main__":
     log.info("Starting debug uvicorn")

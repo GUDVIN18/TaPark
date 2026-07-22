@@ -23,6 +23,19 @@ class Settings(BaseSettings):
     VECTOR_DIMENSION: int = Field(..., env="VECTOR_DIMENSION")
     BATCH_SIZE: int = Field(..., env="BATCH_SIZE")
 
+    USEDESK_API_TOKEN: str = Field(..., env="USEDESK_API_TOKEN")
+    USEDESK_COMPANY_ID: int = Field(..., env="USEDESK_COMPANY_ID")
+    USEDESK_CHANNEL_ID: int = Field(..., env="USEDESK_CHANNEL_ID")
+    USEDESK_AGENT_ID: int = Field(..., env="USEDESK_AGENT_ID")
+    USEDESK_BASE_URL: str = Field(
+        "https://api.usedesk.ru",
+        env="USEDESK_BASE_URL",
+    )
+    USEDESK_TIMEOUT_SECONDS: float = Field(
+        10.0,
+        env="USEDESK_TIMEOUT_SECONDS",
+    )
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
