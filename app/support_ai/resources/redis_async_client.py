@@ -33,6 +33,7 @@ class AsyncRedisClient:
     
     async def get_session_history_v2(
             self,
+            limit=None
         ) -> list:
         
         # Асинхронный запрос к Redis
@@ -45,7 +46,7 @@ class AsyncRedisClient:
                 lc_messages.append(HumanMessage(content=data['content']))
             elif data['role'] == 'ai':
                 lc_messages.append(AIMessage(content=data['content']))
-        return lc_messages
+        return lc_messages[-(limit or 20):]
 
     async def get_recent_rag_contexts(self, limit: int = 6) -> list[dict]:
         history = await self.client.lrange(self.key, 0, -1)

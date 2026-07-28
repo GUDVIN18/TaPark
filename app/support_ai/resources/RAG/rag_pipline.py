@@ -45,6 +45,7 @@ def build_rag_query(message: str, rag_context: dict[str, Any] | None = None) -> 
     scopes = _rag_scopes(rag_context)
 
     query_parts = [
+        message, # Исходный вопрос пользователя сохраняется в RAG-запросе
         rag_context.get("query_focus", ""),
         *[
             f"Раздел: {chapter_title}. Подразделы: {', '.join(child_titles)}"

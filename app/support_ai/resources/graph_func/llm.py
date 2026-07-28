@@ -7,11 +7,17 @@ from app.include.logging_config import logger as log
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 CONTEXT_DIR = BASE_DIR / "prompts"
+PROMPT_FILES = (
+    "company.md",
+    "system.md",
+    "fallback.md",
+    "response_style.md",
+)
 
 try:
     SYSTEM_INSTRUCTION = "\n\n".join(
-        file.read_text(encoding="utf-8").strip()
-        for file in sorted(CONTEXT_DIR.glob("*.md"))
+        (CONTEXT_DIR / file_name).read_text(encoding="utf-8").strip()
+        for file_name in PROMPT_FILES
     )
 except Exception:
     log.exception("Failed to load prompt files")
