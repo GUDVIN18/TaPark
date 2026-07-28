@@ -5,7 +5,7 @@ services:
     image: qdrant/qdrant:latest
     container_name: qdrant_vector_db
     ports:
-      - "6333:6333"
+      - "127.0.0.1:6333:6333"
     volumes:
       - ./appqdrant_storage:/qdrant/storage
     restart: always
@@ -13,9 +13,9 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
-    command: redis-server --requirepass MyStrongPassword123
+    command: redis-server --requirepass ${REDIS_PASS}
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     restart: always
 
   app:
@@ -31,4 +31,11 @@ services:
     environment:
       QDRANT_HOST: qdrant
       QDRANT_PORT: 6333
+    volumes:
+      - ./app/support_ai/resources/RAG/knowledge_base:/app/app/support_ai/resources/RAG/knowledge_base
     restart: always
+
+networks:
+  default:
+    external: true
+    name: tapark_default

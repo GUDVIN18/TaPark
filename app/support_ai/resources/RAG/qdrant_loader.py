@@ -533,5 +533,5 @@ class SleepAiRagEmbeddingConfig:
             
 if __name__ == "__main__":
     SleepAiRagEmbeddingConfig.run_qdrant_pipeline(
-        file_path=Path("app/support_ai/resources/RAG/knowledge_base/Железяки.Описание работы.md")
+        file_path=Path("app/support_ai/resources/RAG/knowledge_base/upload/Железяки.Описание_работы-2_20260725_000509.md")
     )

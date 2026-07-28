@@ -6,11 +6,16 @@ from app.include.logging_config import logger as log
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-print(f"BASE_DIR: {BASE_DIR}")
+CONTEXT_DIR = BASE_DIR / "prompts"
+
 try:
-    SYSTEM_INSTRUCTION = (BASE_DIR / "context" / "agent_instruction.txt").read_text(encoding="utf-8")
-except Exception as e:
-    log.error(f"Failed to load prompts: {e}")
+    SYSTEM_INSTRUCTION = "\n\n".join(
+        file.read_text(encoding="utf-8").strip()
+        for file in sorted(CONTEXT_DIR.glob("*.md"))
+    )
+except Exception:
+    log.exception("Failed to load prompt files")
+    raise
 
 llm_analytics = ChatQwQ(
     api_key=config.QWEN_API_KEY,
@@ -20,6 +25,7 @@ llm_analytics = ChatQwQ(
     extra_body={
         "enable_thinking": False,
     },
+    # max_tokens=3000
 )
 main_llm=ChatQwQ(
     api_key=config.QWEN_API_KEY,

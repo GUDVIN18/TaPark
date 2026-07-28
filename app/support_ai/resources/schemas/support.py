@@ -55,11 +55,9 @@ class SupportAi(UploadSupportAi):
         None,
         description="Вопрос пользователя в поддержку"
     )
-    answer: str = Field(
-        None,
-        description=(
-            "Ответ пользователю."
-        )
+    answer: str | None = Field(
+        default=None,
+        description="Ответ пользователю.",
     )
 
     # buttons: Optional[List[Button]] = Field(

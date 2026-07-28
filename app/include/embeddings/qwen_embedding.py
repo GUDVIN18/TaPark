@@ -4,7 +4,7 @@ from app.include.config import config
 
 
 dashscope.api_key = config.QWEN_API_KEY
-dashscope.base_http_api_url = "https://dashscope-intl.aliyuncs.com/api/v1"
+dashscope.base_http_api_url = "https://ws-g1gxhshcnses7mvw.ap-southeast-1.maas.aliyuncs.com/api/v1"
 
 
 class QwenEmbedding(Embeddings):
