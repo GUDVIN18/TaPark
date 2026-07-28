@@ -798,7 +798,8 @@
     // Не публикуйте реальный серверный секрет в production frontend.
     const API_ENDPOINT = "/ai/chat";
     const API_SECRET = "";
-    const USER_ID = 1;
+    // Временный идентификатор создаётся один раз при каждой загрузке страницы.
+    const USER_ID = crypto.getRandomValues(new Uint32Array(1))[0] || 1;
 
     const panel = document.getElementById("chatPanel");
     const openButtons = document.querySelectorAll("[data-open-chat]");
