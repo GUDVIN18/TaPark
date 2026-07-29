@@ -253,8 +253,8 @@ async def call_admin(state: SupportAi) -> SupportAi:
     confirmation = interrupt({
         "type": "operator_confirmation",
         "message": (
-            "Ваш вопрос требует вмешательства оператора. "
-            "Вы готовы заполнить форму обратной связи?"
+            "Ваш вопрос требует индивидуального подхода."
+            "Готовы заполнить форму, чтобы служба поддержки с вами связалась?"
         ),
     })
     state.message = str(confirmation).strip()
@@ -324,7 +324,7 @@ async def request_user_email(state: SupportAi) -> SupportAi:
     email = interrupt({
         "type": "user_email",
         "message": (
-            "Укажите, пожалуйста, ваш email для обратной связи."
+            "Укажите логин от личного кабинета ТА парк (в качестве логина используется email)"
         ),
     })
 
@@ -346,8 +346,7 @@ async def request_user_content(state: SupportAi) -> SupportAi:
     user_content = interrupt({
         "type": "user_content",
         "message": (
-            "Опишите, пожалуйста, что вы хотите узнать "
-            "или какую проблему необходимо решить."
+            "Пожалуйста, опишите проблему. Если она связана с конкретным водителем — укажите номер его телефона"
         ),
     })
 
@@ -374,7 +373,7 @@ async def send_form_operator(state: SupportAi) -> SupportAi:
         name=f"Клиент {state.user_email}",
         email=state.user_email
     )
-    state.answer = "Ваша заявка успешно отправлена!"
+    state.answer = "Спасибо! Ожидайте ответа на почту в течение 48 часов 😊"
     return state
 
 
