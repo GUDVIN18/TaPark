@@ -135,6 +135,10 @@ class SleepAiRagEmbeddingConfig:
             for chapter, children in chapter_children.items()
             for child in children
         }
+        headings_by_title = {
+            heading["title"]: heading
+            for heading in headings
+        }
 
         chapters = []
         for heading in headings:
@@ -142,12 +146,31 @@ class SleepAiRagEmbeddingConfig:
             if title in child_to_chapter:
                 continue
 
-            children = chapter_children.get(title, [])
-            if not children:
-                children = SleepAiRagEmbeddingConfig._discover_internal_children(
-                    block=heading.get("block", ""),
-                    parent_title=title,
-                )
+            direct_children = chapter_children.get(title, [])
+            children = list(direct_children)
+            searchable_blocks = [heading]
+            searchable_blocks.extend(
+                headings_by_title[child]
+                for child in direct_children
+                if child in headings_by_title
+            )
+
+            # `children` is also the list of exact metadata values available to
+            # the RAG context selector. Keep direct subchapters there, but add
+            # topics and sections from their blocks as well. Otherwise the text
+            # is indexed correctly, yet a concrete question is invisible in the
+            # schema shown to the intent classifier and context selector.
+            seen_children = {child.casefold() for child in children}
+            for searchable_heading in searchable_blocks:
+                for child in SleepAiRagEmbeddingConfig._discover_internal_children(
+                    block=searchable_heading.get("block", ""),
+                    parent_title=searchable_heading["title"],
+                ):
+                    normalized_child = child.casefold()
+                    if normalized_child in seen_children:
+                        continue
+                    seen_children.add(normalized_child)
+                    children.append(child)
 
             chapters.append({
                 "title": title,
