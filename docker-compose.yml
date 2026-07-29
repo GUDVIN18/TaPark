@@ -6,6 +6,7 @@ services:
     container_name: qdrant_vector_db
     ports:
       - "127.0.0.1:6333:6333"
+      # - "6333:6333"
     volumes:
       - ./appqdrant_storage:/qdrant/storage
     restart: always
