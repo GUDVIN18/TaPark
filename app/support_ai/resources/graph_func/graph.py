@@ -1,6 +1,7 @@
 import json
 from app.support_ai.resources.redis_async_client import AsyncRedisClient
 from langchain_core.prompts import PromptTemplate
+from langchain_text_splitters import MarkdownHeaderTextSplitter
 from app.include.logging_config import logger as log
 from .llm import main_llm, llm_analytics, SYSTEM_INSTRUCTION
 from .parcers import (
@@ -14,6 +15,7 @@ from ..schemas import (
     SupportAi,
     IntentType,
     CreateFormType,
+    QaAnalyzeType
 )
 from app.include.decorator import current_time
 from langgraph.types import interrupt
@@ -269,7 +271,7 @@ async def call_admin(state: SupportAi) -> SupportAi:
 @current_time
 async def classify_operator_confirmation(state: SupportAi) -> SupportAi:
     """Узел для определения намеренья создания заявки"""
-    history_messages = state.history_messages[-3:] if state.history_messages else []
+    history_messages = state.history_messages[-5:] if state.history_messages else []
 
     prompt_template = PromptTemplate(
         template="""
@@ -374,7 +376,7 @@ async def send_form_operator(state: SupportAi) -> SupportAi:
         name=f"Клиент {state.user_email}",
         email=state.user_email
     )
-    state.answer = "Спасибо! Ожидайте ответа на почту в течение 48 часов 😊"
+    state.answer = "Спасибо! Ожидайте ответа на почту в течение 24 часов 😊"
     return state
 
 
@@ -450,3 +452,31 @@ async def llm_response(state: SupportAi) -> SupportAi:
     except Exception as e:
         log.error(f"{state.user_id}: Ошибка в llm_response: {e}")
     return state
+
+
+
+async def qa_analyze(state: SupportAi) -> SupportAi:
+    with open("app/support_ai/resources/RAG/knowledge_base/qa.md", "r", encoding="utf-8") as qa_base:
+        qa_base_text = qa_base.read()
+        splitter = MarkdownHeaderTextSplitter(
+            headers_to_split_on=[("#", "question")],
+            strip_headers=True,
+        )
+        documents = splitter.split_text(qa_base_text)
+
+        for document in documents:
+            question = str(document.metadata["question"]).lower()
+            answer = document.page_content
+
+            if state.message.lower() == question:
+                state.qa_analyze_type = QaAnalyzeType.QA
+                state.answer = answer
+            else:
+                state.qa_analyze_type = QaAnalyzeType.AI
+        return state
+
+
+
+
+def route_qa_analyze(state: SupportAi) -> str:
+    return state.qa_analyze_type.value

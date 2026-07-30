@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, Optional, Literal, List
 from langchain_core.messages import BaseMessage
 from .buttons import Button, ButtonType
-from .type_ansers import CreateFormType
+from .type_ansers import CreateFormType, QaAnalyzeType
 
 
 class UploadSupportAi(BaseModel):
@@ -54,6 +54,10 @@ class SupportAi(UploadSupportAi):
     user_content: str = Field(
         None,
         description="Вопрос пользователя в поддержку"
+    )
+    qa_analyze_type: QaAnalyzeType = Field(
+        QaAnalyzeType.AI,
+        description="Вопрос из QA или надо идти в AI?"
     )
     answer: str | None = Field(
         default=None,

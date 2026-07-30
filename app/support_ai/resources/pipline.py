@@ -13,7 +13,8 @@ from .schemas import (
     UploadSupportAi, 
     SupportAi,
     IntentType,
-    CreateFormType
+    CreateFormType,
+    QaAnalyzeType
 )
 from .exceptions import (
     SupportAiErrorConnect,
@@ -32,6 +33,8 @@ from .graph_func.graph import (
     request_user_content,
     send_form_operator,
     cancel_operator_request,
+    qa_analyze,
+    route_qa_analyze
 )
 
 
@@ -54,6 +57,7 @@ async def geration_pipe(
     graph = StateGraph(SupportAi)
 
     # node
+    graph.add_node("qa_analyze", qa_analyze)
     graph.add_node("_current_history", _current_history)
     graph.add_node("intent_classifier", intent_classifier) # Определяет вопрос по БЗ / Не по БЗ / сразу оператор
     graph.add_node("dynemic_rag_context", dynemic_rag_context) # Формируется промпт с описанием всех полей для RAG поиска
@@ -69,7 +73,17 @@ async def geration_pipe(
     graph.add_node("cancel_operator_request", cancel_operator_request)
 
     # ребра
-    graph.add_edge(START, "_current_history")
+    # Определяем, вопрос есть в заготовленной базе или идем в ИИ
+    graph.add_edge(START, "qa_analyze")
+    graph.add_conditional_edges(
+        "qa_analyze",
+        route_qa_analyze,
+        {
+            QaAnalyzeType.QA.value: END,
+            QaAnalyzeType.AI.value: "_current_history",
+        }
+    )
+    #Ai
     graph.add_edge("_current_history", "intent_classifier")
 
     graph.add_conditional_edges(
@@ -106,7 +120,6 @@ async def geration_pipe(
 
     try:
         snapshot = await app.aget_state(graph_config)
-        log.info(f"{snapshot=}")
         if snapshot.next:
             result = await app.ainvoke(
                 Command(resume=data.message),
