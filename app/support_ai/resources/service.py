@@ -1,6 +1,7 @@
 from pathlib import Path
 import datetime as dt
 import re
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 
 
@@ -8,11 +9,12 @@ KNOWLEDGE_BASE_DIR = Path("app/support_ai/resources/RAG/knowledge_base")
 UPLOAD_DIR = KNOWLEDGE_BASE_DIR / "upload"
 
 def _safe_upload_name(filename: str) -> str:
+    MOSCOW_TZ = ZoneInfo("Europe/Moscow")
     source_name = Path(filename).name
     stem = Path(source_name).stem
     suffix = Path(source_name).suffix.lower()
     safe_stem = re.sub(r"[^A-Za-zА-Яа-яЁё0-9_.-]+", "_", stem).strip("._")
-    timestamp = dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = dt.datetime.now(MOSCOW_TZ).strftime("%Y%m%d_%H-%M-%S")
     return f"{safe_stem or 'knowledge_base'}_{timestamp}{suffix}"
 
 

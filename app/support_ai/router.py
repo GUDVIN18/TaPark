@@ -71,9 +71,15 @@ async def upload_kb(
 )
 async def get_kb_files():
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    files = sorted(
+        UPLOAD_DIR.glob("*.md"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
     return [
         path.resolve().relative_to(Path.cwd().resolve()).as_posix()
-        for path in sorted(UPLOAD_DIR.glob("*.md"))
+        for path in files
         if path.is_file()
     ]
 
