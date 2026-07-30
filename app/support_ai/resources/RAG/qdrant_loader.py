@@ -37,7 +37,6 @@ class SleepAiRagEmbeddingConfig:
     @staticmethod
     def run_qdrant_pipeline(file_path: Path):
         # Пересоздаем коллекцию для чистоты теста
-        # Пересоздаем коллекцию для чистоты теста
         try:
             if qdrant_client.collection_exists(collection_name=f"{config.COLLECTION_NAME_AI}"):
                 qdrant_client.delete_collection(collection_name=f"{config.COLLECTION_NAME_AI}")
