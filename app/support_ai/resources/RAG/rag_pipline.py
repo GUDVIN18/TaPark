@@ -12,8 +12,8 @@ embeddings = QwenEmbedding(
     dimensions=config.VECTOR_DIMENSION
 )
 
-SEARCH_KWARGS = {"k": 8, "fetch_k": 30, "lambda_mult": 0.75}
-MAX_CONTEXT_DOCUMENTS = 12
+SEARCH_KWARGS = {"k": 15, "fetch_k": 40, "lambda_mult": 0.77}
+MAX_CONTEXT_DOCUMENTS = 15
 
 
 def _vector_store() -> QdrantVectorStore:
