@@ -92,7 +92,8 @@ async def geration_pipe(
         route_operator_confirmation,
         {
             CreateFormType.CONFIRMED.value: "request_user_email",
-            CreateFormType.DECLINED.value: "cancel_operator_request"
+            CreateFormType.DECLINED.value: "cancel_operator_request",
+            CreateFormType.NEW_QUESTION.value: "intent_classifier",
         }
     )
     graph.add_edge("request_user_email", "request_user_content")

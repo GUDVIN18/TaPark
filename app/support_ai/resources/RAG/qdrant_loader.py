@@ -9,7 +9,10 @@ import re
 import json
 from typing import Any
 from qdrant_client.models import Distance, VectorParams
-from langchain_text_splitters import MarkdownHeaderTextSplitter
+from langchain_text_splitters import (
+    MarkdownHeaderTextSplitter,
+    RecursiveCharacterTextSplitter,
+)
 
 
 # запуск скрипта строго локально. python -m app.support_ai.resources.RAG.qdrant_loader
@@ -28,6 +31,8 @@ class SleepAiRagEmbeddingConfig:
         ("####", "section"),
     ]
     header_order = ("chapter", "subchapter", "topic", "section")
+    chunk_size = 1600
+    chunk_overlap = 180
 
     @staticmethod
     def run_qdrant_pipeline(file_path: Path):
@@ -215,14 +220,66 @@ class SleepAiRagEmbeddingConfig:
                 continue
 
             metadata = SleepAiRagEmbeddingConfig._normalize_metadata(doc.metadata)
-            structured_docs.append({
-                "content": content,
-                "metadata": metadata,
-            })
+            for chunk in SleepAiRagEmbeddingConfig._split_content(content):
+                structured_docs.append({
+                    "content": chunk,
+                    "metadata": metadata,
+                })
         with open("app/support_ai/resources/RAG/knowledge_base/structured_docs.json", "w", encoding="utf-8") as f:
             json.dump(structured_docs, f, ensure_ascii=False, indent=2) 
         log.info(f"Текст структурирован через MarkdownHeaderTextSplitter: {len(structured_docs)} секций.")
         return structured_docs
+
+    @staticmethod
+    def _split_content(content: str) -> list[str]:
+        """Split oversized sections and keep explicit question/answer pairs whole.
+
+        MarkdownHeaderTextSplitter cannot split a long FAQ without inner
+        headings. Such a section used to become one 6k+ character vector, which
+        diluted every individual question and made exact answers hard to find.
+        """
+        content = SleepAiRagEmbeddingConfig._clean_text(content)
+        if not content:
+            return []
+
+        question_starts = [
+            match.start()
+            for match in re.finditer(r"(?im)^[ \t]*Вопрос:[ \t]*\S", content)
+        ]
+        if not question_starts:
+            return SleepAiRagEmbeddingConfig._split_long_text(content)
+
+        chunks = []
+        prefix = content[:question_starts[0]].strip()
+        if prefix:
+            chunks.extend(SleepAiRagEmbeddingConfig._split_long_text(prefix))
+
+        for index, start in enumerate(question_starts):
+            end = (
+                question_starts[index + 1]
+                if index + 1 < len(question_starts)
+                else len(content)
+            )
+            qa_pair = content[start:end].strip()
+            chunks.extend(SleepAiRagEmbeddingConfig._split_long_text(qa_pair))
+
+        return chunks
+
+    @staticmethod
+    def _split_long_text(content: str) -> list[str]:
+        if len(content) <= SleepAiRagEmbeddingConfig.chunk_size:
+            return [content]
+
+        splitter = RecursiveCharacterTextSplitter(
+            chunk_size=SleepAiRagEmbeddingConfig.chunk_size,
+            chunk_overlap=SleepAiRagEmbeddingConfig.chunk_overlap,
+            separators=["\n\n", "\n", ". ", " ", ""],
+        )
+        return [
+            chunk.strip()
+            for chunk in splitter.split_text(content)
+            if chunk.strip()
+        ]
 
     @staticmethod
     def preparation(structured_docs: list[dict[str, Any]]) -> list[dict[str, Any]]:

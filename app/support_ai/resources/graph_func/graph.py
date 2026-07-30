@@ -275,10 +275,11 @@ async def classify_operator_confirmation(state: SupportAi) -> SupportAi:
         template="""
     Ты классифицируешь текущее сообщение пользователя для определения - создаем зявку или нет.
 
-    Доступные категории: CONFIRMED, DECLINED
+    Доступные категории: CONFIRMED, DECLINED, NEW_QUESTION
 
     CONFIRMED - если пользователь подтверждает создание заявки
     DECLINED - если пользователь отказывается от создания заявки
+    NEW_QUESTION - если пользователь задал новый вопрос 
 
     История диалога:
     {history}
@@ -289,7 +290,7 @@ async def classify_operator_confirmation(state: SupportAi) -> SupportAi:
     {format_instructions}
 
     Верни ТОЛЬКО JSON без дополнительных комментариев!
-    Значение form_type должно быть строго одним из: CONFIRMED, DECLINED
+    Значение form_type должно быть строго одним из: CONFIRMED, DECLINED, NEW_QUESTION
     """,
         input_variables=[
             "input",

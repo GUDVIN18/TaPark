@@ -12,3 +12,4 @@ class IntentType(str, Enum):
 class CreateFormType(str, Enum):
     CONFIRMED = "CONFIRMED"
     DECLINED = "DECLINED"
+    NEW_QUESTION = "NEW_QUESTION"

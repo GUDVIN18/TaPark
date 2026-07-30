@@ -1,3 +1,4 @@
+import asyncio
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 from typing import Any
@@ -11,7 +12,8 @@ embeddings = QwenEmbedding(
     dimensions=config.VECTOR_DIMENSION
 )
 
-SEARCH_KWARGS = {"k": 12, "fetch_k": 35, "lambda_mult": 0.75}
+SEARCH_KWARGS = {"k": 8, "fetch_k": 30, "lambda_mult": 0.75}
+MAX_CONTEXT_DOCUMENTS = 12
 
 
 def _vector_store() -> QdrantVectorStore:
@@ -98,6 +100,31 @@ def _metadata_filter(rag_context: dict[str, Any] | None = None) -> models.Filter
     return models.Filter(should=filter_variants)
 
 
+def _chapter_filter(rag_context: dict[str, Any] | None = None) -> models.Filter | None:
+    """Build a less restrictive filter for documents nested under another child.
+
+    The schema shown to the selector is intentionally flat, while Qdrant metadata
+    is hierarchical. A selected child can therefore be a sibling of the chunk
+    that actually contains the answer. Searching the whole selected chapter in
+    parallel prevents that answer from being filtered out.
+    """
+    chapters = [
+        models.FieldCondition(
+            key="chapter",
+            match=models.MatchValue(value=chapter_title),
+        )
+        for chapter_title, _ in _rag_scopes(rag_context)
+    ]
+    if not chapters:
+        return None
+    if len(chapters) == 1:
+        return models.Filter(must=[chapters[0]])
+    return models.Filter(should=[
+        models.Filter(must=[chapter_condition])
+        for chapter_condition in chapters
+    ])
+
+
 def _retriever(vector_store: QdrantVectorStore, qdrant_filter: models.Filter | None = None):
     search_kwargs = SEARCH_KWARGS.copy()
     if qdrant_filter:
@@ -109,21 +136,84 @@ def _retriever(vector_store: QdrantVectorStore, qdrant_filter: models.Filter | N
     )
 
 
+def _merge_document_lists(
+    document_lists: list[list[Any]],
+    limit: int = MAX_CONTEXT_DOCUMENTS,
+) -> list[Any]:
+    """Round-robin scoped and global results, removing identical chunks."""
+    merged = []
+    seen = set()
+    max_length = max((len(documents) for documents in document_lists), default=0)
+
+    for index in range(max_length):
+        for documents in document_lists:
+            if index >= len(documents):
+                continue
+            document = documents[index]
+            identity = document.page_content.strip()
+            if not identity or identity in seen:
+                continue
+            seen.add(identity)
+            merged.append(document)
+            if len(merged) >= limit:
+                return merged
+
+    return merged
+
+
 async def retrieve_docs(query: str, rag_context: dict[str, Any] | None = None):
     vector_store = _vector_store()
-    qdrant_filter = _metadata_filter(rag_context)
+    exact_filter = _metadata_filter(rag_context)
+    chapter_filter = _chapter_filter(rag_context)
 
+    # Always include a global search. Previously it ran only when a metadata
+    # filter returned zero documents. A non-empty but irrelevant filtered result
+    # therefore hid exact FAQ answers stored under another chapter.
+    filters = []
+    serialized_filters = set()
+    for qdrant_filter in (exact_filter, chapter_filter, None):
+        identity = (
+            qdrant_filter.model_dump_json(exclude_none=True)
+            if qdrant_filter is not None
+            else "<global>"
+        )
+        if identity in serialized_filters:
+            continue
+        serialized_filters.add(identity)
+        filters.append(qdrant_filter)
+
+    # Generate the query embedding once. Invoking three retrievers separately
+    # would make three identical external embedding requests.
     try:
-        docs = await _retriever(vector_store, qdrant_filter).ainvoke(query)
-        if docs or not qdrant_filter:
-            return docs
+        query_embedding = await embeddings.aembed_query(query)
+    except Exception as error:
+        log.error(f"RAG query embedding failed: {error}")
+        return []
 
-        log.warning("RAG filter returned 0 documents. Fallback to unfiltered search.")
-        return await _retriever(vector_store).ainvoke(query)
+    results = await asyncio.gather(
+        *[
+            vector_store.amax_marginal_relevance_search_by_vector(
+                query_embedding,
+                **SEARCH_KWARGS,
+                filter=qdrant_filter,
+            )
+            for qdrant_filter in filters
+        ],
+        return_exceptions=True,
+    )
 
-    except Exception as e:
-        log.error(f"Fallback to unfiltered MMR due to: {e}")
-        return await _retriever(vector_store).ainvoke(query)
+    successful_results = []
+    for qdrant_filter, result in zip(filters, results):
+        if isinstance(result, Exception):
+            scope = "global" if qdrant_filter is None else "filtered"
+            log.error(f"RAG {scope} search failed: {result}")
+            continue
+        successful_results.append(result)
+
+    documents = _merge_document_lists(successful_results)
+    if not documents:
+        log.warning("RAG search returned no documents.")
+    return documents
 
 
 async def retriever_context(rag_context: dict[str, Any] | None = None):
