@@ -37,14 +37,21 @@ class SleepAiRagEmbeddingConfig:
     @staticmethod
     def run_qdrant_pipeline(file_path: Path):
         # Пересоздаем коллекцию для чистоты теста
-        if qdrant_client.collection_exists(collection_name=f"{config.COLLECTION_NAME_AI}"):
-            qdrant_client.delete_collection(collection_name=f"{config.COLLECTION_NAME_AI}")
-            
-        log.info(f"Создание коллекции: {f'{config.COLLECTION_NAME_AI}'}")
-        qdrant_client.recreate_collection(
-            collection_name=f"{config.COLLECTION_NAME_AI}",
-            vectors_config=VectorParams(size=config.VECTOR_DIMENSION, distance=Distance.COSINE)
-        )
+        # Пересоздаем коллекцию для чистоты теста
+        try:
+            if qdrant_client.collection_exists(collection_name=f"{config.COLLECTION_NAME_AI}"):
+                qdrant_client.delete_collection(collection_name=f"{config.COLLECTION_NAME_AI}")
+        except:
+            log.info(f"Не получилось удалить коллекцию.")
+
+        try:
+            qdrant_client.create_collection(
+                collection_name=f"{config.COLLECTION_NAME_AI}",
+                vectors_config=VectorParams(size=config.VECTOR_DIMENSION, distance=Distance.COSINE)
+            )
+        except:
+            log.info(f"Не получилось создать коллекцию.")
+            return
         try:
             log.info(f"{qdrant_client.get_collections()}")
         except Exception as e:
