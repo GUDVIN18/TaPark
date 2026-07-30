@@ -1,4 +1,5 @@
 import asyncio
+import re
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 from typing import Any
@@ -64,6 +65,11 @@ def _metadata_filter(rag_context: dict[str, Any] | None = None) -> models.Filter
     for chapter_title, child_titles in _rag_scopes(rag_context):
         if child_titles:
             for child_title in child_titles:
+                child_title = re.sub(
+                    r"^\d+(?:\.\d+)*[.)]?\s*",
+                    "",
+                    child_title,
+                )
                 for metadata_key in ("subtitle", "topic", "section"):
                     filter_variants.append(
                         models.Filter(

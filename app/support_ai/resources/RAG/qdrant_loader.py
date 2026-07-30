@@ -312,10 +312,17 @@ class SleepAiRagEmbeddingConfig:
 
     @staticmethod
     def _normalize_metadata(metadata: dict[str, Any]) -> dict[str, str]:
-        return {
+        normalized = {
             key: SleepAiRagEmbeddingConfig._clean_text(str(metadata.get(key, "")), heading=True)
             for key in SleepAiRagEmbeddingConfig.header_order
         }
+        for key in ("subchapter", "topic", "section"):
+            normalized[key] = re.sub(
+                r"^\d+(?:\.\d+)*[.)]?\s*",
+                "",
+                normalized[key],
+            )
+        return normalized
 
     @staticmethod
     def _build_vector_text(metadata: dict[str, str], content: str) -> str:
