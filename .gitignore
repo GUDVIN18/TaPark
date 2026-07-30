@@ -6,6 +6,4 @@
 .zip
 .log.zip
 *.log.zip
-app/support_ai/resources/RAG/knowledge_base/upload/*
-appqdrant_storage/*
 /appqdrant_storage/
