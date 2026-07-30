@@ -6,4 +6,4 @@
 .zip
 .log.zip
 *.log.zip
-/appqdrant_storage/
+/appqdrant_storage/*
