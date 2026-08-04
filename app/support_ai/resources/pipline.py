@@ -10,7 +10,7 @@ from .redis_async_client import AsyncRedisClient
 from app.usedesc.service import usedesk_service
 from app.include.logging_config import logger as log
 from app.include.config import config
-from app.core.db import db_pool
+from app.core.db import db_pool, Connection
 from .crud import ChatHisoryCrud, UserProfileCrud
 from .schemas import (
     UploadSupportAi, 
@@ -19,6 +19,8 @@ from .schemas import (
     CreateFormType,
     QaAnalyzeType,
     UserProfile,
+    ChatHistory,
+    Role,
 )
 from .exceptions import (
     SupportAiErrorConnect,
@@ -149,14 +151,39 @@ async def geration_pipe(
 
         try:
             async with db_pool.get_connection() as conn:
-                user_profile = await UserProfileCrud.get(conn=conn,user_id=data.user_id)
-                if not user_profile:
-                    user_profile = await UserProfileCrud.create(
-                        conn=conn,
-                        data=UserProfile(
-                            user_id=data.user_id
+                conn: Connection
+                try:
+                    user_profile = await UserProfileCrud.get(conn=conn,user_id=data.user_id)
+                    if not user_profile:
+                        user_profile = await UserProfileCrud.create(
+                            conn=conn,
+                            data=UserProfile(
+                                user_id=data.user_id
+                            )
                         )
-                    )
+                except Exception as e:
+                    log.error(f"Ошибка при получении/создании профиля пользователя: {e}")
+
+                try:
+                    async with conn.transaction():
+                        await ChatHisoryCrud.create(
+                            conn=conn,
+                            data=ChatHistory(
+                                user_id=data.user_id,
+                                role=Role.user,
+                                content=data.message,
+                            )
+                        )
+                        await ChatHisoryCrud.create(
+                            conn=conn,
+                            data=ChatHistory(
+                                user_id=data.user_id,
+                                role=Role.ai,
+                                content=result.answer,
+                            )
+                        )
+                except Exception as e:
+                    log.error(f"Ошибка при добавлении истории пользователя: {e}")
                 
                 
             async with AsyncRedisClient(

@@ -11,3 +11,4 @@ from .classifier import (
     FormClassifier
 )
 from .user_profile import UserProfile, UserProfileFrom
+from .chat_history import ChatHistory, ChatHistoryFrom, Role

@@ -1,5 +1,5 @@
 from .meta import metadata
-from sqlalchemy import JSON, Column, DateTime, Integer, SmallInteger, String, Table, sql, Boolean
+from sqlalchemy import JSON, Column, DateTime, Integer, SmallInteger, String, Table, sql, Boolean, BigInteger
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 
@@ -8,7 +8,7 @@ chat_history_table = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     Column('uuid', UUID, nullable=False),
-    Column("user_id", Integer, nullable=True, index=True),
+    Column("user_id", BigInteger, nullable=True, index=True),
     Column('role', String, nullable=True),
     Column("content", String, nullable=True),
     Column("reactions", Boolean, nullable=True),
