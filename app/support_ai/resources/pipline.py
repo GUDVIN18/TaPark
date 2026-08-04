@@ -10,7 +10,7 @@ from .redis_async_client import AsyncRedisClient
 from app.usedesc.service import usedesk_service
 from app.include.logging_config import logger as log
 from app.include.config import config
-from app.core.db import DBConnPool
+from app.core.db import db_pool
 from .crud import ChatHisoryCrud, UserProfileCrud
 from .schemas import (
     UploadSupportAi, 
@@ -148,14 +148,13 @@ async def geration_pipe(
             result = SupportAi(**result)
 
         try:
-            async with DBConnPool.get_connection() as conn:
+            async with db_pool.get_connection() as conn:
                 user_profile = await UserProfileCrud.get(conn=conn,user_id=data.user_id)
                 if not user_profile:
                     user_profile = await UserProfileCrud.create(
                         conn=conn,
                         data=UserProfile(
-                            user_id=data.user_id,
-                            created_at=dt.datetime.now().isoformat()
+                            user_id=data.user_id
                         )
                     )
                 

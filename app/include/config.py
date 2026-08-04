@@ -3,6 +3,8 @@ from pydantic import Field
 
 
 class Settings(BaseSettings):
+    SERVICE_NAME: str = Field(..., env="SERVICE_NAME")
+
     DOCKER_SECRET: str = Field(..., env="DOCKER_SECRET")
 
     LOG_LEVEL: str = Field("DEBUG")
@@ -52,7 +54,7 @@ class Settings(BaseSettings):
     )
 
     @property
-    def DB_URL() -> str:
+    def DB_URL(self) -> str:
         return (
             f"postgresql+asyncpg://{config.POSTGRES_USER}:{config.POSTGRES_PASS}"
             f"@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_DB}"

@@ -1,1 +1,1 @@
-from .pool import DBConnPool, Connection
+from .pool import db_pool, Connection

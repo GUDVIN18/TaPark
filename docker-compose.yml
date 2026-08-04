@@ -46,7 +46,7 @@ services:
       QDRANT_PORT: 6333
     volumes:
       - ./app/support_ai/resources/RAG/knowledge_base:/app/app/support_ai/resources/RAG/knowledge_base
-      - /containers/src/vehicle/TaPark/logs:/logs
+      # - /containers/src/vehicle/TaPark/logs:/logs
     restart: always
 
 networks:

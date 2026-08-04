@@ -1,4 +1,4 @@
-from app.core.db import DBConnPool, Connection
+from app.core.db import db_pool, Connection
 
 from app.core.db.tables import chat_history_table
 
