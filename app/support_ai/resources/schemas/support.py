@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Literal, List
 from langchain_core.messages import BaseMessage
 from .buttons import Button, ButtonType
 from .type_ansers import CreateFormType, QaAnalyzeType
+from uuid import UUID
 
 
 class UploadSupportAi(BaseModel):
@@ -13,8 +14,17 @@ class UploadSupportAi(BaseModel):
         description="Уникальный идентификатор пользователя"
     )
 
+class Message(BaseModel):
+    message_id: Optional[int] = Field(
+        None,
+        description="Уникальный идентификатор сообщения"
+    )
+    message_uuid: Optional[UUID] = Field(
+        None,
+        description="UUID сообщения"
+    )
 
-class SupportAi(UploadSupportAi):
+class SupportAi(UploadSupportAi, Message):
     history_messages: List[BaseMessage] = Field(
         None,
         description="История сообщений пользователя"

@@ -21,6 +21,7 @@ from .schemas import (
     UserProfile,
     ChatHistory,
     Role,
+    ChatHistoryFrom
 )
 from .exceptions import (
     SupportAiErrorConnect,
@@ -174,7 +175,7 @@ async def geration_pipe(
                                 content=data.message,
                             )
                         )
-                        await ChatHisoryCrud.create(
+                        create_message_obj: ChatHistoryFrom = await ChatHisoryCrud.create(
                             conn=conn,
                             data=ChatHistory(
                                 user_id=data.user_id,
@@ -182,6 +183,10 @@ async def geration_pipe(
                                 content=result.answer,
                             )
                         )
+                        
+                        result.message_id=create_message_obj.id
+                        result.message_uuid=create_message_obj.uuid
+                        log.success(f"История пользователя успешно добавлена: {create_message_obj.id}, {create_message_obj.uuid}")
                 except Exception as e:
                     log.error(f"Ошибка при добавлении истории пользователя: {e}")
                 

@@ -1,5 +1,5 @@
 from .buttons import Button, ButtonType
-from .support import SupportAi, UploadSupportAi
+from .support import SupportAi, UploadSupportAi, UpdateKbRequest
 from .type_ansers import (
     IntentType, 
     CreateFormType, 
@@ -12,3 +12,4 @@ from .classifier import (
 )
 from .user_profile import UserProfile, UserProfileFrom
 from .chat_history import ChatHistory, ChatHistoryFrom, Role
+from .reaction import ReactionRequest

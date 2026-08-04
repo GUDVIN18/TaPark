@@ -3,11 +3,13 @@ import datetime as dt
 import re
 from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from .resources.schemas.support import (
+from .resources.schemas import (
     UploadSupportAi, 
     SupportAi,
     UpdateKbRequest,
+    ReactionRequest,
 )
+from app.core.db import db_pool
 from .resources.pipline import geration_pipe
 from app.include.logging_config import logger as log
 from ..include.permissions import secret_access
@@ -18,6 +20,7 @@ from .resources.service import (
     KNOWLEDGE_BASE_DIR,
     UPLOAD_DIR,
 )
+from .resources.crud import ReactionCrud
 
 
 router = APIRouter()
@@ -103,3 +106,26 @@ async def update_kb(data: UpdateKbRequest):
 
 
     
+@router.post(
+    "/set-reaction",
+    response_model=str,
+    dependencies=[Depends(secret_access)],
+    name="Поставить реакцию на ответ SupportAi",
+)
+async def set_reaction(
+    data: ReactionRequest,
+) -> str:
+    log.info(f"{data.user_id}: SET REACTION {data=}")
+    try:
+        async with db_pool.get_connection() as conn:
+            await ReactionCrud.set_reaction(
+                conn=conn,
+                data=data
+            )
+        return "Реакция успешно сохранена."
+    except Exception as e:
+        log.error(f"Ошибка при сохранении реакции: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Ошибка при сохранении реакции.",
+        )
