@@ -20,6 +20,17 @@ services:
       - 6379:6379
     restart: always
 
+  postgres:
+    image: postgres:18.4
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    restart: always
+
   app:
     build: .
     container_name: ta_park_ai_app
@@ -35,6 +46,7 @@ services:
       QDRANT_PORT: 6333
     volumes:
       - ./app/support_ai/resources/RAG/knowledge_base:/app/app/support_ai/resources/RAG/knowledge_base
+      - /containers/src/vehicle/TaPark/logs:/logs
     restart: always
 
 networks:

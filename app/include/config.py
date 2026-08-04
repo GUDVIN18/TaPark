@@ -13,6 +13,15 @@ class Settings(BaseSettings):
     ANALYTICS_MODEL_AI: str = Field(..., env="ANALYTICS_MODEL_AI")
     EMBEDDING_MODEL_ID: str = Field(..., env="EMBEDDING_MODEL_ID")
 
+    POSTGRES_USER: str = Field(..., env="POSTGRES_USER")
+    POSTGRES_PASS: str = Field(..., env="POSTGRES_PASS")
+    POSTGRES_DB: str = Field(..., env="POSTGRES_DB")
+    POSTGRES_PORT: int = Field(5432, env="POSTGRES_PORT")
+    POSTGRES_HOST: str = Field(..., env="POSTGRES_HOST")
+    DB_MIN_CONNECTIONS: int = Field(1, env="DB_MIN_CONNECTIONS")
+    DB_MAX_CONNECTIONS: int = Field(20, env="DB_MAX_CONNECTIONS")
+
+
     REDIS_IP: str = Field(..., env="REDIS_IP")
     REDIS_PASS: str = Field(..., env="REDIS_PASS")
     REDIS_PORT: int = Field(..., env="REDIS_PORT")
@@ -42,5 +51,17 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @property
+    def DB_URL() -> str:
+        return (
+            f"postgresql+asyncpg://{config.POSTGRES_USER}:{config.POSTGRES_PASS}"
+            f"@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_DB}"
+        )
+    # @property
+    # def DB_MIGRATION_URL() -> str:
+    #     return f"postgresql://" \
+    #            f"{config.POSTGRES_USER}:{config.POSTGRES_PASS}@" \
+    #            f"{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/" \
+    #            f"{config.POSTGRES_DB}"
 
 config = Settings()

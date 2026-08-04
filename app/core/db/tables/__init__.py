@@ -1,0 +1,2 @@
+from .chat_history import chat_history_table
+from .user_profile import user_profile_table

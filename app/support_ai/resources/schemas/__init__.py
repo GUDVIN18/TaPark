@@ -10,3 +10,4 @@ from .classifier import (
     DynemicRagContext, 
     FormClassifier
 )
+from .user_profile import UserProfile, UserProfileFrom
