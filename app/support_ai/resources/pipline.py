@@ -183,8 +183,8 @@ if __name__ == "__main__":
 
     async def main():
         data = UploadSupportAi(
-            user_id="155",
-            message="оператор"
+            user_id="1515",
+            message="привет"
         )
         print(f"Результат: {await geration_pipe(data)}")
 
