@@ -22,7 +22,7 @@ services:
 
   postgres:
     image: postgres:18.4
-    container_name: postgres
+    container_name: postgres_ai
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
