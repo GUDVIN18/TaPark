@@ -5,8 +5,8 @@ services:
     image: qdrant/qdrant:latest
     container_name: qdrant_vector_db
     ports:
-      # - "127.0.0.1:6333:6333"
-      - "6333:6333"
+      - "127.0.0.1:6333:6333"
+      # - "6333:6333"
     volumes:
       - ./appqdrant_storage:/qdrant/storage
     restart: always
@@ -16,8 +16,7 @@ services:
     container_name: redis
     command: redis-server --requirepass ${REDIS_PASS}
     ports:
-      # - "127.0.0.1:6379:6379"
-      - 6379:6379
+      - "127.0.0.1:6379:6379"
     restart: always
 
   postgres:
@@ -28,7 +27,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "127.0.0.1:${POSTGRES_PORT}:5432"
     restart: always
 
   app:
@@ -37,7 +36,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8881:8881"
+      - "127.0.0.1:8881:8881"
     depends_on:
       - qdrant
       - redis
