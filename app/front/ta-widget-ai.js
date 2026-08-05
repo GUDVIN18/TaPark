@@ -1,26 +1,12 @@
 /**
  * TA-Park AI Chat Widget
  * Самодостаточный виджет с изоляцией стилей через Shadow DOM
- * 
- * Использование:
- * <script src="/path/to/ta-park-widget.js"></script>
- * <script>
- *   TaParkWidget.init({
- *     apiEndpoint: '/ai/chat',
- *     reactionEndpoint: '/ai/set-reaction',
- *     apiSecret: 'your-secret-here',
- *     userId: 12345,
- *     position: 'bottom-right' // 'bottom-right' | 'bottom-left'
- *   });
- * </script>
  */
-
 (function () {
   'use strict';
 
   const WIDGET_TAG = 'ta-park-chat-widget';
 
-  // Стили полностью изолированы внутри Shadow DOM
   const STYLES = `
     :host {
       all: initial;
@@ -40,19 +26,11 @@
       --line: rgba(61, 37, 96, 0.11);
       --shadow: 0 28px 80px rgba(47, 24, 79, 0.22);
     }
-
-    :host([position="bottom-left"]) {
-      left: 28px; right: auto; bottom: 26px;
-    }
-    :host(:not([position="bottom-left"])) {
-      right: 28px; bottom: 26px;
-    }
-
+    :host([position="bottom-left"]) { left: 28px; right: auto; bottom: 26px; }
+    :host(:not([position="bottom-left"])) { right: 28px; bottom: 26px; }
     *, *::before, *::after { box-sizing: border-box; }
-
     button, textarea { font: inherit; -webkit-tap-highlight-color: transparent; }
 
-    /* Launcher */
     .launcher {
       display: grid; width: 76px; height: 76px; place-items: center;
       color: var(--primary-dark); border: 0; border-radius: 26px; cursor: pointer;
@@ -72,7 +50,6 @@
       border: 4px solid var(--canvas); border-radius: 999px; background: #ff5e7e;
     }
 
-    /* Panel */
     .panel {
       position: fixed; z-index: 2147483647; display: grid;
       width: min(430px, calc(100vw - 32px)); height: min(700px, calc(100vh - 52px));
@@ -86,7 +63,6 @@
     :host(:not([position="bottom-left"])) .panel { right: 28px; bottom: 26px; }
     .panel.is-open { opacity: 1; visibility: visible; transform: translateY(0) scale(1); }
 
-    /* Header */
     .header {
       display: flex; align-items: center; gap: 13px; padding: 21px 20px; color: white;
       background: radial-gradient(circle at 12% -30%, rgba(105, 220, 188, 0.55), transparent 48%),
@@ -108,7 +84,6 @@
     }
     .close-btn:hover { background: rgba(255,255,255,0.2); }
 
-    /* Messages */
     .messages {
       overflow-y: auto; padding: 22px 18px 14px; scroll-behavior: smooth;
       background: linear-gradient(rgba(248,247,252,0.93), rgba(248,247,252,0.93)),
@@ -135,7 +110,6 @@
     }
     .msg-row.error .bubble { color: #943148; border-color: rgba(207,72,104,0.2); background: #fff4f6; }
 
-    /* Feedback */
     .feedback { display: flex; gap: 6px; margin-top: 6px; margin-left: 4px; opacity: 0; animation: fbIn 300ms ease forwards 150ms; }
     .no-feedback .feedback { display: none; }
     .fb-btn {
@@ -149,13 +123,11 @@
     .fb-btn.is-active.dislike { background: #ff5e7e; border-color: #ff5e7e; color: white; }
     .fb-btn:disabled { cursor: default; opacity: 0.4; }
 
-    /* Typing */
     .typing { display: flex; align-items: center; min-width: 62px; min-height: 42px; gap: 5px; }
     .typing span { width: 7px; height: 7px; border-radius: 50%; background: #937cab; animation: type 1.1s infinite ease-in-out; }
     .typing span:nth-child(2) { animation-delay: 120ms; }
     .typing span:nth-child(3) { animation-delay: 240ms; }
 
-    /* Quick Questions */
     .quick-q {
       display: flex; overflow: hidden; flex-wrap: wrap; gap: 8px; max-height: 190px;
       padding: 14px 16px; border-top: 1px solid var(--line); background: white;
@@ -169,7 +141,6 @@
     }
     .qq-btn:hover { color: white; background: var(--accent); transform: translateY(-1px); }
 
-    /* Form */
     .form { display: flex; align-items: flex-end; gap: 10px; padding: 14px 16px 16px; border-top: 1px solid var(--line); background: white; }
     .input-wrap {
       min-width: 0; flex: 1; padding: 2px 2px 2px 14px; border: 1px solid transparent;
@@ -237,7 +208,7 @@
 
       <form class="form">
         <label class="input-wrap">
-          <span class="sr-only" style="position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Сообщение</span>
+          <span style="position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Сообщение</span>
           <textarea class="input" rows="1" maxlength="3000" placeholder="Спросите про TA-Park..." required></textarea>
         </label>
         <button class="send-btn" type="submit" aria-label="Отправить">
@@ -260,7 +231,7 @@
 
     connectedCallback() {
       const shadow = this.attachShadow({ mode: 'open' });
-      shadow.innerHTML = `<style>${STYLES}</style>${TEMPLATE}`;
+      shadow.innerHTML = '<style>' + STYLES + '</style>' + TEMPLATE;
       this._bindEvents(shadow);
       this._addInitialMessages(shadow);
     }
@@ -297,7 +268,7 @@
 
       input.addEventListener('input', () => {
         input.style.height = 'auto';
-        input.style.height = `${Math.min(input.scrollHeight, 110)}px`;
+        input.style.height = Math.min(input.scrollHeight, 110) + 'px';
       });
 
       input.addEventListener('keydown', e => {
@@ -316,7 +287,6 @@
         btn.addEventListener('click', () => this._sendMessage(btn.textContent, shadow));
       });
 
-      // Делегирование для кнопок реакций
       messages.addEventListener('click', e => {
         const btn = e.target.closest('.fb-btn');
         if (!btn || btn.disabled) return;
@@ -330,11 +300,15 @@
     }
 
     _addInitialMessages(shadow) {
-      const messages = this._$(shadow, '.messages');
-      messages.appendChild(this._createMsgEl('Привет! 👋 Я AI-ассистент TA-Park. Помогу разобраться в кабинете и отвечу на вопросы по базе знаний.', 'assistant'));
-      const second = this._createMsgEl('С чего начнём? Выберите частый вопрос или напишите свой.', 'assistant');
-      second.classList.add('no-feedback');
-      messages.appendChild(second);
+    const messages = this._$(shadow, '.messages');
+    
+    const first = this._createMsgEl('Привет! 👋 Я AI-ассистент TA-Park. Помогу разобраться в кабинете и отвечу на вопросы по базе знаний.', 'assistant');
+    first.classList.add('no-feedback');
+    messages.appendChild(first);
+
+    const second = this._createMsgEl('С чего начнём? Выберите частый вопрос или напишите свой.', 'assistant');
+    second.classList.add('no-feedback');
+    messages.appendChild(second);
     }
 
     _scrollToBottom(shadow) {
@@ -342,9 +316,10 @@
       m.scrollTo({ top: m.scrollHeight, behavior: 'smooth' });
     }
 
-    _createMsgEl(text, type, msgData = {}) {
+    _createMsgEl(text, type, msgData) {
+      msgData = msgData || {};
       const row = document.createElement('div');
-      row.className = `msg-row ${type}`;
+      row.className = 'msg-row ' + type;
 
       if (type !== 'user') {
         const av = document.createElement('span');
@@ -365,9 +340,9 @@
       if (type === 'assistant') {
         const fb = document.createElement('div');
         fb.className = 'feedback';
-        fb.innerHTML = `
-          <button class="fb-btn like" type="button" aria-label="Полезный ответ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button>
-          <button class="fb-btn dislike" type="button" aria-label="Бесполезный ответ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></button>`;
+        fb.innerHTML =
+          '<button class="fb-btn like" type="button" aria-label="Полезный ответ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button>' +
+          '<button class="fb-btn dislike" type="button" aria-label="Бесполезный ответ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></svg></button>';
         wrapper.appendChild(fb);
       }
 
@@ -419,18 +394,18 @@
         });
 
         let data;
-        try { data = JSON.parse(await res.text()); } catch { throw new Error('Неизвестный формат ответа'); }
-        if (!res.ok) throw new Error(data.detail || `Ошибка ${res.status}`);
-        if (!data.answer?.trim()) throw new Error('Пустой ответ сервера');
+        try { data = JSON.parse(await res.text()); } catch (e) { throw new Error('Неизвестный формат ответа'); }
+        if (!res.ok) throw new Error(data.detail || ('Ошибка ' + res.status));
+        if (!data.answer || !data.answer.trim()) throw new Error('Пустой ответ сервера');
 
         typing.remove();
         messages.appendChild(this._createMsgEl(data.answer.trim(), 'assistant', {
-          messageId: data.message_id ?? null,
-          messageUuid: data.message_uuid ?? null
+          messageId: data.message_id != null ? data.message_id : null,
+          messageUuid: data.message_uuid != null ? data.message_uuid : null
         }));
       } catch (err) {
         typing.remove();
-        messages.appendChild(this._createMsgEl(`Не получилось связаться с ассистентом. ${err.message}`, 'error'));
+        messages.appendChild(this._createMsgEl('Не получилось связаться с ассистентом. ' + err.message, 'error'));
       } finally {
         this._isSending = false;
         input.disabled = false; sendBtn.disabled = false;
@@ -453,7 +428,7 @@
           headers: { 'Content-Type': 'application/json', 'Secret': this._config.apiSecret || '' },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
+        if (!res.ok) throw new Error('Status ' + res.status);
       } catch (err) {
         console.error('Reaction error:', err);
         btn.classList.remove('is-active');
@@ -462,23 +437,23 @@
     }
   }
 
-  // Регистрация custom element
   if (!customElements.get(WIDGET_TAG)) {
     customElements.define(WIDGET_TAG, TaParkChatWidget);
   }
 
-  // Публичный API
   window.TaParkWidget = {
-    init(config = {}) {
-      let el = document.querySelector(WIDGET_TAG);
+    init: function (config) {
+      config = config || {};
+      var el = document.querySelector(WIDGET_TAG);
       if (!el) {
         el = document.createElement(WIDGET_TAG);
         document.body.appendChild(el);
       }
       el.init(config);
     },
-    destroy() {
-      document.querySelector(WIDGET_TAG)?.remove();
+    destroy: function () {
+      var el = document.querySelector(WIDGET_TAG);
+      if (el) el.remove();
     }
   };
 })();
