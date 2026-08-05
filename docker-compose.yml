@@ -36,7 +36,7 @@ services:
     env_file:
       - .env
     ports:
-      - "8881:8881"
+      - "127.0.0.1:8881:8881"
     depends_on:
       - qdrant
       - redis
