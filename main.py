@@ -1,6 +1,7 @@
 from app.include.logging_config import logger as log
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from app.router import main_router
@@ -25,6 +26,15 @@ app = FastAPI(
         Depends(APIKeyHeader(name='Secret', scheme_name='api_secret', auto_error=False))
     ],
 )
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # В продакшене укажите конкретный домен фронтенда
+    allow_credentials=True,
+    allow_methods=["*"],   # Разрешает все методы, включая OPTIONS
+    allow_headers=["*"],
+)
+
 app.include_router(main_router)
 app.mount("/front", StaticFiles(directory="app/front", html=True), name="front")
 
