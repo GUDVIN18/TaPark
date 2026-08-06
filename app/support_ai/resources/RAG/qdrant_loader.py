@@ -15,13 +15,14 @@ from langchain_text_splitters import (
 )
 
 
-# запуск скрипта строго локально. python -m app.support_ai.resources.RAG.qdrant_loader
+# запуск скрипта строго локально: python -m app.support_ai.resources.RAG.qdrant_loader
 embeddings_qwen = QwenEmbedding(
     model=config.EMBEDDING_MODEL_ID,
     dimensions=config.VECTOR_DIMENSION
 )
 
 qdrant_client = QdrantClient(host=config.QDRANT_HOST, port=config.QDRANT_PORT)
+
 
 class SleepAiRagEmbeddingConfig:
     headers_to_split_on = [
@@ -51,6 +52,7 @@ class SleepAiRagEmbeddingConfig:
         except Exception as e:
             log.info(f"Не получилось создать коллекцию. {e}")
             return
+        
         try:
             log.info(f"{qdrant_client.get_collections()}")
         except Exception as e:
@@ -61,8 +63,10 @@ class SleepAiRagEmbeddingConfig:
         clering_file_text = SleepAiRagEmbeddingConfig.clear(file_path)
         schema = SleepAiRagEmbeddingConfig.build_schema(clering_file_text)
         SleepAiRagEmbeddingConfig.write_schema(file_path, schema)
+        
         # структурируем текст на главы, подглавы и т.д.
         structured_text = SleepAiRagEmbeddingConfig.structure_text(clering_file_text, schema=schema)
+        
         # подготовка текста для эмбеддинга
         try:
             preparation = SleepAiRagEmbeddingConfig.preparation(structured_text)
@@ -84,7 +88,7 @@ class SleepAiRagEmbeddingConfig:
                     
                 points.append(
                     models.PointStruct(
-                        id=str(uuid.uuid4()), # Генерируем уникальный ID
+                        id=str(uuid.uuid4()),
                         vector=vectors[i],
                         payload={
                             "original_file": file_path.name,
@@ -123,6 +127,23 @@ class SleepAiRagEmbeddingConfig:
 
     @staticmethod
     def build_schema(md_text: str) -> dict[str, Any]:
+        flat_schema = SleepAiRagEmbeddingConfig._build_flat_schema(md_text)
+        normalized_markdown = SleepAiRagEmbeddingConfig._adapt_markdown_structure(
+            md_text,
+            flat_schema,
+        )
+
+        return {
+            "schema_version": 2,
+            "headers_to_split_on": flat_schema["headers_to_split_on"],
+            "chapter_children": flat_schema["chapter_children"],
+            "chapters": SleepAiRagEmbeddingConfig._build_heading_tree(
+                normalized_markdown
+            ),
+        }
+
+    @staticmethod
+    def _build_flat_schema(md_text: str) -> dict[str, Any]:
         lines = md_text.splitlines()
         headings = []
 
@@ -166,11 +187,6 @@ class SleepAiRagEmbeddingConfig:
                 if child in headings_by_title
             )
 
-            # `children` is also the list of exact metadata values available to
-            # the RAG context selector. Keep direct subchapters there, but add
-            # topics and sections from their blocks as well. Otherwise the text
-            # is indexed correctly, yet a concrete question is invisible in the
-            # schema shown to the intent classifier and context selector.
             seen_children = {child.casefold() for child in children}
             for searchable_heading in searchable_blocks:
                 for child in SleepAiRagEmbeddingConfig._discover_internal_children(
@@ -199,6 +215,38 @@ class SleepAiRagEmbeddingConfig:
             "chapter_children": chapter_children,
             "chapters": chapters,
         }
+
+    @staticmethod
+    def _build_heading_tree(markdown_text: str) -> list[dict[str, Any]]:
+        """Build the complete section hierarchy from normalized Markdown."""
+        chapters: list[dict[str, Any]] = []
+        stack: list[tuple[int, dict[str, Any]]] = []
+
+        for line in markdown_text.splitlines():
+            match = re.match(r"^\s*(#{1,4})\s+(.+?)\s*$", line)
+            if not match:
+                continue
+
+            level = len(match.group(1))
+            title = SleepAiRagEmbeddingConfig._clean_text(
+                match.group(2),
+                heading=True,
+            ).rstrip(":")
+            if not title:
+                continue
+
+            node = {"title": title, "children": []}
+            while stack and stack[-1][0] >= level:
+                stack.pop()
+
+            if stack:
+                stack[-1][1]["children"].append(node)
+            else:
+                chapters.append(node)
+
+            stack.append((level, node))
+
+        return chapters
 
     @staticmethod
     def write_schema(file_path: Path, schema: dict[str, Any]) -> None:
@@ -231,19 +279,15 @@ class SleepAiRagEmbeddingConfig:
                     "content": chunk,
                     "metadata": metadata,
                 })
+                
         with open("app/support_ai/resources/RAG/knowledge_base/structured_docs.json", "w", encoding="utf-8") as f:
             json.dump(structured_docs, f, ensure_ascii=False, indent=2) 
+            
         log.info(f"Текст структурирован через MarkdownHeaderTextSplitter: {len(structured_docs)} секций.")
         return structured_docs
 
     @staticmethod
     def _split_content(content: str) -> list[str]:
-        """Split oversized sections and keep explicit question/answer pairs whole.
-
-        MarkdownHeaderTextSplitter cannot split a long FAQ without inner
-        headings. Such a section used to become one 6k+ character vector, which
-        diluted every individual question and made exact answers hard to find.
-        """
         content = SleepAiRagEmbeddingConfig._clean_text(content)
         if not content:
             return []
@@ -429,40 +473,52 @@ class SleepAiRagEmbeddingConfig:
 
     @staticmethod
     def _discover_internal_children(block: str, parent_title: str) -> list[str]:
+        """
+        Улучшенный поиск внутренних заголовков.
+        Добавлена поддержка списков (*, -) для корректного разбора раздела 'Водители'.
+        """
         children = []
         seen = set()
 
         heading_patterns = [
-            r'(?im)^\s*#{2,6}\s+(.+?)\s*$',
-            r'(?im)^\s*\d+\\?[\.)]\s+\*\*([^*\n]{1,140})\*\*.*$',
-            r'(?im)^\s*\d+\\?[\.)]\s+([А-ЯЁ][^.\n]{3,90})\s*$',
-            r'(?im)^\s*\*\*([^*\n]{1,140})\*\*\s*$',
+            r'(?im)^\s*#{2,6}\s+(.+?)\s*$',                          # Стандартные MD заголовки
+            r'(?im)^\s*\d+\\?[\.)]\s+\*\*([^*\n]{1,140})\*\*.*$',     # Нумерованные жирные
+            r'(?im)^\s*\d+\\?[\.)]\s+([А-ЯЁ][^.\n]{3,90})\s*$',       # Нумерованные капсом
+            r'(?im)^\s*\*\*([^*\n]{1,140})\*\*\s*$',                  # Просто жирные строки
+            # Паттерны для списков (критично для раздела Водители)
+            r'(?im)^\s*[-*]\s+\*\*([^*\n]{3,100})\*\*',               # Элемент списка с жирным названием
+            r'(?im)^\s*[-*]\s+([А-ЯЁ][А-Яа-яё\s\d\-]{3,80})(?=\s*[-–:]|\s*$)',  # Список с названием
         ]
+
+        # Стоп-слова, чтобы не превращать шаги инструкций в заголовки схемы
+        list_stop_prefixes = (
+            "нажмите", "заполните", "кликните", "выберите", "перейдите", 
+            "в открывшемся", "убедитесь", "проверьте", "сохраните", 
+            "укажите", "введите", "отметьте", "если", "для того",
+            "система", "водитель", "автомобиль"
+        )
 
         for pattern in heading_patterns:
             for match in re.finditer(pattern, block):
                 title = SleepAiRagEmbeddingConfig._clean_text(match.group(1), heading=True).rstrip(":")
                 normalized = title.lower().strip(" :")
 
-                if not title or normalized in seen:
+                if not title or len(title) < 3 or len(title) > 90:
+                    continue
+                if normalized in seen:
                     continue
                 if normalized == parent_title.lower().strip(" :"):
                     continue
-                if normalized.startswith("подробная инструкция") or normalized.startswith("инструкция"):
+                if normalized.startswith(("подробная инструкция", "инструкция", "важно", "пример")):
                     continue
-                if len(title) > 90:
-                    continue
-                if normalized.startswith((
-                    "нажмите",
-                    "заполните",
-                    "кликните",
-                    "выберите",
-                    "перейдите",
-                    "в открывшемся",
-                )):
-                    continue
-                if title.startswith("![]"):
-                    continue
+                
+                # Дополнительная фильтрация для списковых элементов
+                if any(normalized.startswith(prefix) for prefix in list_stop_prefixes):
+                    raw_match = match.group(0)
+                    # Если это просто предложение, начинающееся со стоп-слова, пропускаем.
+                    # Но если после названия идет описание через тире/двоеточие - оставляем.
+                    if not re.search(r'[:–-]\s', raw_match) and normalized.startswith(list_stop_prefixes):
+                        continue
 
                 seen.add(normalized)
                 children.append(title)
@@ -543,6 +599,30 @@ class SleepAiRagEmbeddingConfig:
 
             return 3
 
+        def resolve_list_item_level(title: str, raw_line: str) -> int | None:
+            """Определяет, является ли пункт списка заголовком раздела."""
+            normalized = title.lower().strip()
+            
+            # Ключевые слова, характерные для подразделов водителей
+            section_keywords = [
+                "график", "расчеты", "баланс", "документы", "штрафы", 
+                "ущербы", "увольнение", "доступ", "платные дороги", 
+                "осмотры", "выпуск", "данные водителя", "агрегаторы",
+                "статус", "черновики", "поиск", "настройки"
+            ]
+            
+            is_section = any(kw in normalized for kw in section_keywords)
+            has_description_separator = bool(re.search(r'[:–-]\s', raw_line))
+            is_all_caps_or_bold = bool(re.match(r'^[А-ЯЁ\s\d\-]+$', title)) or '**' in raw_line
+            
+            if is_section or (has_description_separator and is_all_caps_or_bold):
+                # Если мы уже внутри topic (например, Индивидуальная вкладка), то это section (4)
+                # Иначе это topic (3)
+                if current_titles["topic"] and not is_intro_title(current_titles["topic"]):
+                    return 4
+                return 3
+            return None
+
         lines = []
         current_titles = {key: "" for key in SleepAiRagEmbeddingConfig.header_order}
         active_parent_chapter = ""
@@ -556,14 +636,32 @@ class SleepAiRagEmbeddingConfig:
         for raw_line in text.splitlines():
             line = raw_line.rstrip()
 
+            list_match = re.match(
+                r'^\s*[-*]\s+\*\*(?P<title_bold>[^*\n]{3,100})\*\*\s*$',
+                line
+            )
+            if list_match and (
+                current_titles["chapter"] == "Водители" 
+                or current_titles["subchapter"] 
+                or current_titles["topic"]
+            ):
+                title = list_match.group("title_bold")
+                if title:
+                    title = SleepAiRagEmbeddingConfig._clean_text(title, heading=True).rstrip(":")
+                    level = resolve_list_item_level(title, line)
+                    if level:
+                        lines.append(format_header(level, title))
+                        update_current_titles(level, title)
+                        continue
+
             numbered_bold_match = re.match(r'^\s*\d+\\?\.\s+\*\*(?P<title>[^*\n]{1,140}?)\*\*', line)
             if numbered_bold_match and (
                 current_titles["subchapter"]
-                or is_block_container(current_titles["topic"])
+                or current_titles["topic"]
             ):
                 title = SleepAiRagEmbeddingConfig._clean_text(numbered_bold_match.group("title"), heading=True)
                 if title:
-                    level = 4 if is_block_container(current_titles["topic"]) else 3
+                    level = 4 if current_titles["topic"] else 3
                     lines.append(format_header(level, title))
                     update_current_titles(level, title)
                 continue
@@ -626,5 +724,5 @@ class SleepAiRagEmbeddingConfig:
             
 if __name__ == "__main__":
     SleepAiRagEmbeddingConfig.run_qdrant_pipeline(
-        file_path=Path("app/support_ai/resources/RAG/knowledge_base/upload/Железяки.Описание_работы-2_20260725_000509.md")
+        file_path=Path("app/support_ai/resources/RAG/knowledge_base/upload/Железяки.Описание_работы-4_20260730_15-22-13.md")
     )
